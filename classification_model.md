@@ -9,13 +9,15 @@ From the table above, the model with the highest performance is the Naive Bayes.
 
 ### Exploring classification models to find the best one:
 
+#### Libraries:
+
 Install PySpark:
 ```
 %%bash
 pip install pyspark &> /dev/null
 ```
 
-Import statements here and create spark and sparkcontext objects
+Import statements here and create spark and sparkcontext objects:
 ```
 from pyspark.sql import SparkSession
 from pyspark.sql import SQLContext
@@ -38,5 +40,124 @@ import re
 
 from pyspark.sql.functions import *
 ```
+
+#### Data
+
+Import the data and filter out unnecessary columns:
+```
+datasource = spark.read.format("csv") \
+                  .load('/content/book32-listing.csv', delimiter=',', encoding='ISO-8859-1')
+```
+```
+newColumns = ['ASIN', 'FILENAME', 'IMAGE_URL', 'TITLE', 'AUTHOR', 'CATEGORY_ID', 'CATEGORY']
+df = datasource.toDF(*newColumns)
+df.printSchema()
+```
+
+Drop all the NA values from the dataset.
+Add a DESCR column which combines author and title to make the best descriptive parameter for book title.
+```
+df_noNull = df.na.drop()
+
+df_noNull = df_noNull.withColumn("DESCR", concat(df_noNull.TITLE,df_noNull.AUTHOR))
+df2 = df_noNull.select(df_noNull.columns[3:8])
+df2.show(5)
+```
+```
++--------------------+------------------+-----------+---------+--------------------+
+|               TITLE|            AUTHOR|CATEGORY_ID| CATEGORY|               DESCR|
++--------------------+------------------+-----------+---------+--------------------+
+|Mom's Family Wall...|    Sandra Boynton|          3|Calendars|Mom's Family Wall...|
+|Doug the Pug 2016...|      Doug the Pug|          3|Calendars|Doug the Pug 2016...|
+|Moleskine 2016 We...|         Moleskine|          3|Calendars|Moleskine 2016 We...|
+|365 Cats Color Pa...|Workman Publishing|          3|Calendars|365 Cats Color Pa...|
+|Sierra Club Engag...|       Sierra Club|          3|Calendars|Sierra Club Engag...|
++--------------------+------------------+-----------+---------+--------------------+
+only showing top 5 rows
+```
+
+
+#### Pre-processing
+
+Create a few tokenizers for every column (title, author separately) as well as for the DESCR column.
+Create stopwordsRemover for Title and DESCR, since there are no stopwords in the Author column.
+Create a few count vectorizers for each tokenizer.
+Experimented with different values for the vocab size and minDF for the countVectorizer and 30,000 and 10 were yielding the best results.
+Also, use the assembler to create a single vector combining author and title.
+```
+from pyspark.ml.feature import RegexTokenizer, StopWordsRemover, CountVectorizer, IDF
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.classification import LogisticRegression
+
+# regular expression tokenizer
+regexTokenizer1 = RegexTokenizer(inputCol="TITLE", outputCol="TITLEwords", pattern="\\W")
+regexTokenizer2 = RegexTokenizer(inputCol="AUTHOR", outputCol="AUTHORwords", pattern="\\W")
+regexTokenizer3 = RegexTokenizer(inputCol="DESCR", outputCol="DESCRwords", pattern="\\W")
+
+# stop words
+add_stopwords = ["and","a","the"]
+stopwordsRemover = StopWordsRemover(inputCol="TITLEwords", outputCol="TITLEfiltered").setStopWords(add_stopwords)
+stopwordsRemover3 = StopWordsRemover(inputCol="DESCRwords", outputCol="DESCRfiltered").setStopWords(add_stopwords)
+
+# bag of words count
+countVectors1 = CountVectorizer(inputCol="TITLEfiltered", outputCol="features1", vocabSize=30000, minDF=10)
+countVectors2 = CountVectorizer(inputCol="AUTHORwords", outputCol="features2", vocabSize=30000, minDF=10)
+countVectors3 = CountVectorizer(inputCol="DESCRfiltered", outputCol="features", vocabSize=30000, minDF=10)
+
+#assembler = VectorAssembler(inputCols=["vectorizedFeatures1","vectorizedFeatures2"], outputCol='features')
+
+assembler = VectorAssembler(inputCols=["features1","features2"], outputCol='features')
+```
+
+Create a frequency label with StringIndexer:
+```
+from pyspark.ml.feature import StringIndexer
+label_stringIdx = StringIndexer(inputCol='CATEGORY',outputCol='label').fit(df)
+```
+
+Create two pipelines in case some models break. Cross validation on logistic regression for some reason was working with pipeline2 but not with pipeline1:
+```
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import OneHotEncoder, VectorAssembler
+
+pipeline1 = Pipeline(stages=[regexTokenizer1, regexTokenizer2, stopwordsRemover, countVectors1, countVectors2, assembler, label_stringIdx])
+#pipeline2 = Pipeline(stages=[regexTokenizer3, stopwordsRemover3, countVectors3, label_stringIdx])
+```
+
+Fit the pipeline to training data:
+```
+pipelineFit = pipeline1.fit(df2)
+dataset = pipelineFit.transform(df2)
+dataset.show(5)
+```
+```
++--------------------+------------------+-----------+---------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+-----+
+|               TITLE|            AUTHOR|CATEGORY_ID| CATEGORY|               DESCR|          TITLEwords|         AUTHORwords|       TITLEfiltered|           features1|           features2|            features|label|
++--------------------+------------------+-----------+---------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+-----+
+|Mom's Family Wall...|    Sandra Boynton|          3|Calendars|Mom's Family Wall...|[mom, s, family, ...|   [sandra, boynton]|[mom, s, family, ...|(12458,[3,48,58,7...|(5456,[149,1258],...|(17914,[3,48,58,7...| 27.0|
+|Doug the Pug 2016...|      Doug the Pug|          3|Calendars|Doug the Pug 2016...|[doug, the, pug, ...|    [doug, the, pug]|[doug, pug, 2016,...|(12458,[48,58,126...|(5456,[45,364],[1...|(17914,[48,58,126...| 27.0|
+|Moleskine 2016 We...|         Moleskine|          3|Calendars|Moleskine 2016 We...|[moleskine, 2016,...|         [moleskine]|[moleskine, 2016,...|(12458,[58,110,14...| (5456,[1269],[1.0])|(17914,[58,110,14...| 27.0|
+|365 Cats Color Pa...|Workman Publishing|          3|Calendars|365 Cats Color Pa...|[365, cats, color...|[workman, publish...|[365, cats, color...|(12458,[44,48,58,...|(5456,[25,742],[1...|(17914,[44,48,58,...| 27.0|
+|Sierra Club Engag...|       Sierra Club|          3|Calendars|Sierra Club Engag...|[sierra, club, en...|      [sierra, club]|[sierra, club, en...|(12458,[48,58,103...|(5456,[1287,2337]...|(17914,[48,58,103...| 27.0|
++--------------------+------------------+-----------+---------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+-----+
+only showing top 5 rows
+```
+
+
+#### Partition Training & Test sets
+
+Set seed for reproducibility:
+```
+(trainingData, testData) = dataset.randomSplit([0.7, 0.3], seed = 100)
+print("Training Dataset Count: " + str(trainingData.count()))
+print("Test Dataset Count: " + str(testData.count()))
+```
+```
+Training Dataset Count: 135153
+Test Dataset Count: 58008
+```
+
+
+#### Models Training and Evaluation
 
 
