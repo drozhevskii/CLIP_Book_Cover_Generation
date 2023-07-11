@@ -28,7 +28,7 @@ The main method of generating the most closely related images of book covers fro
 
 ### Code
 
-Code is split into two parts: [classification](code/ist718_prj_part1.py) and [CLIP fine-tuning](ist718_prj_part2.py).
+Code is split into two parts: [classification](code/classification_part.py) and [CLIP fine-tuning](code/finetuning_part.py).
 
 ### Results
 
