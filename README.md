@@ -26,6 +26,15 @@ The main method of generating the most closely related images of book covers fro
   ![first_dataset](images/CLIP_dataset.png)
 
 
+### Code
+
+Code is split into two parts: [classification](code/ist718_prj_part1.py) and [CLIP fine-tuning](ist718_prj_part2.py).
+
+### Results
+
+In this study, we evaluated three classification algorithms for the categorization of book genres based on cover images: Naive Bayes, Random Forest, and Logistic Regression. With an accuracy of 58%, our results showed that Logistic Regression with default settings and title/author information performed the best. Logistic Regression and Random Forest also performed well with ROC of 58% and 54%, respectively. Building on these results, we employed the CLIP model to generate images based on the book’s title, author, and genre information. In the future, we plan to improve the classification model and use that to predict book categories and use the updated training data to fine-tune CLIP. This approach presents a novel solution to the problem of generating images for book covers based on their genre and provides a useful tool for publishers and authors to visualize the potential covers for their books.
+
+
 
 
 
