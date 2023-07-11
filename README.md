@@ -1,0 +1,1 @@
+# CLIP_Book_Cover_Generation
