@@ -6,7 +6,7 @@ This step consisted of researching the best classification technique. The models
 
 From the table above, the model with the highest performance is the Naive Bayes. The low accuracy on all the models indicates that there is a weak correlation between a book’s title and its category, which makes sense in real life. Some books’ titles do not give any clues about the category they belong to. However, since it is a hard task even for a human brain, we believe that this approximation is still enough to make a good guess about a book’s category based on its title. We will use the pre-trained Naive Bayes model to make category predictions for the book title prompts in the second dataset used for fine-tuning the model.
 
-The full code is here.
+The full code is [here](code/ist718_prj_part1.py).
 
 ### Exploring classification models to find the best one:
 
