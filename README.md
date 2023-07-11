@@ -18,9 +18,12 @@ The main method of generating the most closely related images of book covers fro
 
 + There are two datasets used in the project; one is used for classification model training and another one for fine-tuning the CLIP model. [The first dataset](https://github.com/uchidalab/book-dataset) used for the classification process had 207,572 books from the Amazon.com, Inc. marketplace. After cleaning and pre-processing steps, the dataset size shrunk to around 193,000 books.
 
-![first_dataset](images/classification_dataset.png)
+  ![first_dataset](images/classification_dataset.png)
+  
 
 + [The second dataset](https://www.kaggle.com/datasets/lukaanicin/book-covers-dataset) consists of 20,590 book cover images and their titles. The idea is to train the classification algorithm on the first dataset and then apply the model to the second one, which is later used for fine-tuning CLIP and the generation of covers given the book title prompt with the predicted genre.
+
+  ![first_dataset](images/CLIP_dataset.png)
 
 
 
