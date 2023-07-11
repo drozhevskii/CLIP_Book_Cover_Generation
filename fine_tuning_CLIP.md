@@ -8,6 +8,8 @@ With the dataset of pairs of images and book titles with predicted categories, w
 
 In the figure above, we use the example book cover and generate a few book title prompts to test for similarity with the book cover. From the table above, we can see that the closest title is estimated to be ”The Power of Nowww” which almost says the same thing as the actual book cover, and the model is able to understand the similarity. In the future, if we add a predicted category to each prompt and fine-tune the model again, we will be able to increase the similarity scores.
 
+The full code is [here](code/ist718_prj_part2.py).
+
 ### The code to fine-tune CLIP with book covers data
 
 Import PySpark:
