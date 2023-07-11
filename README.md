@@ -1,4 +1,4 @@
-## CLIP_Book_Cover_Generation
+## Fine-Tuning CLIP model with Classified Book Cover Images in PySpark
 
 <img src="images/books_cover_background.png" width=40% height=40%>
 
@@ -16,9 +16,9 @@ The main method of generating the most closely related images of book covers fro
 
 ### Datasets
 
-+ There are two datasets used in the project; one is used for classification model training and another one for fine-tuning the CLIP model. The first dataset should be rich and large enough to make a good generalization of the relationship between book titles and author names. [The dataset](https://github.com/uchidalab/book-dataset) used for the classification process had 207,572 books from the Amazon.com, Inc. marketplace. After cleaning and pre-processing steps, the dataset size shrunk to around 193,000 books.
++ There are two datasets used in the project; one is used for classification model training and another one for fine-tuning the CLIP model. [The first dataset](https://github.com/uchidalab/book-dataset) used for the classification process had 207,572 books from the Amazon.com, Inc. marketplace. After cleaning and pre-processing steps, the dataset size shrunk to around 193,000 books.
 
-
+![first_dataset](images/classification_dataset.png)
 
 + [The second dataset](https://www.kaggle.com/datasets/lukaanicin/book-covers-dataset) consists of 20,590 book cover images and their titles. The idea is to train the classification algorithm on the first dataset and then apply the model to the second one, which is later used for fine-tuning CLIP and the generation of covers given the book title prompt with the predicted genre.
 
