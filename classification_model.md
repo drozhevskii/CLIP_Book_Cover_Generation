@@ -6,10 +6,11 @@ This step consisted of researching the best classification technique. The models
 
 From the table above, the model with the highest performance is the Naive Bayes. The low accuracy on all the models indicates that there is a weak correlation between a book’s title and its category, which makes sense in real life. Some books’ titles do not give any clues about the category they belong to. However, since it is a hard task even for a human brain, we believe that this approximation is still enough to make a good guess about a book’s category based on its title. We will use the pre-trained Naive Bayes model to make category predictions for the book title prompts in the second dataset used for fine-tuning the model.
 
+The full code is here.
 
 ### Exploring classification models to find the best one:
 
-#### Libraries:
+### Libraries:
 
 Install PySpark:
 ```
@@ -41,7 +42,7 @@ import re
 from pyspark.sql.functions import *
 ```
 
-#### Data
+### Data
 
 Import the data and filter out unnecessary columns:
 ```
@@ -77,7 +78,7 @@ only showing top 5 rows
 ```
 
 
-#### Pre-processing
+### Pre-processing
 
 Create a few tokenizers for every column (title, author separately) as well as for the DESCR column.
 Create stopwordsRemover for Title and DESCR, since there are no stopwords in the Author column.
@@ -144,7 +145,7 @@ only showing top 5 rows
 ```
 
 
-#### Partition Training & Test sets
+### Partition Training & Test sets
 
 Set seed for reproducibility:
 ```
@@ -158,6 +159,136 @@ Test Dataset Count: 58008
 ```
 
 
-#### Models Training and Evaluation
+### Models Training and Evaluation
+
+Logistic Regression base model using Count Vector Features:
+```
+lr = LogisticRegression(maxIter=100, regParam=0.3, elasticNetParam=0)
+lrModel = lr.fit(trainingData)
+
+predictions = lrModel.transform(testData)
+predictions.filter(predictions['prediction'] == 0) \
+    .select("TITLE","AUTHOR","CATEGORY","probability","label","prediction") \
+    .orderBy("probability", ascending=False) \
+    .show(n = 10, truncate = 30)
+```
+
+Evaluation of Logistic Regression base model:
+```
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+
+evaluator = MulticlassClassificationEvaluator(predictionCol="prediction")
+evaluator.evaluate(predictions)
+```
+```
+0.5808767914899977
+```
+
+Cross-Validation for Logistic Regression(LR):
+```
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+evaluator = MulticlassClassificationEvaluator(predictionCol="prediction")
+
+# here i use the second pipeline since first one breaks and use single DESCR column as predictor input
+pipeline2 = Pipeline(stages=[regexTokenizer3, stopwordsRemover3, countVectors3, label_stringIdx])
+
+pipelineFit = pipeline2.fit(df2)
+dataset = pipelineFit.transform(df2)
+(trainingData, testData) = dataset.randomSplit([0.7, 0.3], seed = 100)
+
+lr = LogisticRegression(maxIter=20, regParam=0.3, elasticNetParam=0)
+
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+
+# Create ParamGrid for Cross Validation
+# i experiment with regulazation parameters since the model tends to overfit a lot
+paramGrid = (ParamGridBuilder()
+             .addGrid(lr.regParam, [0.1, 0.3]) # regularization parameter
+             .addGrid(lr.elasticNetParam, [0.0, 0.1]) # Elastic Net Parameter (Ridge = 0)
+             .build())
+
+# Create 5-fold CrossValidator
+cv = CrossValidator(estimator=lr, \
+                    estimatorParamMaps=paramGrid, \
+                    evaluator=evaluator, \
+                    numFolds=5)
+cvModel = cv.fit(trainingData)
+
+predictions = cvModel.transform(testData)
+# Evaluate best model
+evaluator = MulticlassClassificationEvaluator(predictionCol="prediction")
+evaluator.evaluate(predictions)
+```
+Evaluation of the LR model with best parameters:
+```
+0.569018235934547
+```
+
+Naive Bayes:
+```
+from pyspark.ml.classification import NaiveBayes
+
+nb = NaiveBayes(smoothing=1)
+model = nb.fit(trainingData)
+predictions = model.transform(testData)
+predictions.filter(predictions['prediction'] == 0) \
+    .select("TITLE","AUTHOR","CATEGORY","probability","label","prediction") \
+    .orderBy("probability", ascending=False) \
+    .show(n = 10, truncate = 30)
+```
+
+Evaluation of Naive Bayes base model:
+```
+evaluator = MulticlassClassificationEvaluator(predictionCol="prediction")
+evaluator.evaluate(predictions)
+```
+```
+0.5982858622693149
+```
+
+Random Forest base model:
+```
+from pyspark.ml.classification import RandomForestClassifier
+from pyspark.ml import Pipeline
+
+rf = RandomForestClassifier(labelCol="label", featuresCol="features")
+```
+
+Evaluation of Random Forest base model:
+```
+rfModel = rf.fit(trainingData)
+pred = rfModel.transform(testData)
+```
+```
+0.538456834565456
+```
+
+Cross-Validation for Random Forest:
+```
+# 3-Fold Cross validation for Random Forest
+from pyspark.ml.tuning import ParamGridBuilder
+from pyspark.ml.tuning import CrossValidator
+from pyspark.ml.evaluation import RegressionEvaluator
+import numpy as np
+
+# i was trying to make this part work but I couldnt, and my teammates did not help me unfortunately
+paramGrid = ParamGridBuilder() \
+    .addGrid(rf.numTrees, [int(x) for x in np.linspace(start = 10, stop = 100, num = 3)]) \
+    .addGrid(rf.maxDepth, [int(x) for x in np.linspace(start = 5, stop = 25, num = 3)]) \
+    .build()
+
+crossval = CrossValidator(estimator=rf,
+                          estimatorParamMaps=paramGrid,
+                          evaluator=RegressionEvaluator(),
+                          numFolds=3)
+
+cvModel = crossval.fit(trainingData)
+
+predictions = cvModel.transform(testData)
+# Evaluate best model
+evaluator = MulticlassClassificationEvaluator(predictionCol="prediction")
+evaluator.evaluate(predictions)
+```
+
 
 
